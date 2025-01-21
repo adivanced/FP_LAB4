@@ -17,3 +17,6 @@
 #### Описание программы:
 - Точка входа в программу: [erl2048_app.erl](server/src/erl2048_app.erl)
 - Работа с БД: [db.erl](server/src/db.erl)
+- Игровая логика: [game.erl](server/src/game/game.erl)
+- Функции для работы с игровым полем: [grid.erl](server/src/game/grid.erl)
+- Функции для работы с клетками: [tile.erl](server/src/game/tile.erl)
