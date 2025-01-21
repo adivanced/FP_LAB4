@@ -15,5 +15,5 @@
 ## Реализация:
 
 #### Описание программы:
-- Точка входа в программу: [erl2048_app.erl](sever/src/erl2048_app.erl)
-- Работа с БД: [db.erl](sever/src/db.erl)
+- Точка входа в программу: [erl2048_app.erl](server/src/erl2048_app.erl)
+- Работа с БД: [db.erl](server/src/db.erl)
