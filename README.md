@@ -97,7 +97,139 @@ websocket_handle({text, Msg}, Req, State) ->
         _Else -> State
     end,
     {reply, {text, mochijson2:encode(Response)}, Req, NewState};
-
 websocket_handle(_Data, Req, State) ->
     {ok, Req, State}.
+````
+
+**Движение клетки**
+````erlang
+moveTile(Cell, Vector, JsonData) ->
+
+    Grid = proplists:get_value(grid, JsonData),
+    Tile = grid:cellContent(Cell, Grid),
+
+    case Tile =:= null of
+        true -> JsonData;
+        false ->
+            { Farthest, Next } = findFarthestPosition(Cell, Vector, Grid),
+
+            {struct, CurrJsonData} = Tile,
+            CurrValue = proplists:get_value(value, CurrJsonData),
+
+            NextTile = if
+                Next =:= null -> null;
+                true ->
+                    grid:cellContent(Next, Grid)
+            end,
+
+            {NextValue, NextMerged} = if
+                NextTile =:= null -> {null, null};
+                true ->
+                    NextJsonData = element(2, NextTile),
+                    {proplists:get_value(value, NextJsonData), proplists:get_value(mergedFrom, NextJsonData)}
+            end,
+
+            if  CurrValue =:= NextValue,
+                NextMerged =:= null
+                ->
+                    MergedValue = CurrValue * 2,
+                    Merged = {
+                        struct,
+                        [
+                            {value, MergedValue},
+                            {mergedFrom, [Tile,NextTile]},
+                            {previousPosition, null}
+                        ]
+                    },
+                    NewGrid = grid:insertTile(Next, Merged, grid:removeTile(Cell, Grid)),
+
+                    % Update the score
+                    Score = proplists:get_value(score, JsonData) + MergedValue,
+
+                    % The mighty 2048 tile
+                    Won = if
+                        MergedValue =:= 2048 -> true;
+                        true -> false
+                    end,
+
+                    Removed = my_proplists:delete_several([score, won, grid], JsonData),
+
+                    [
+                        {grid,NewGrid},
+                        {won,Won},
+                        {score,Score} |
+                        Removed
+                    ];
+                true ->
+                    [
+                        {
+                            grid,
+                            grid:moveTile(Cell, Farthest, proplists:get_value(grid, JsonData))
+                        }
+                        | proplists:delete(grid, JsonData)
+                    ]
+            end
+    end.
+````
+
+**Движение поля**
+````erlang
+move(left, State) ->
+    move(getVector(left), State);
+move(right, State) -> 
+    move(getVector(right), State);
+move(up, State) -> 
+    move(getVector(up), State);
+move(down, State) -> 
+    move(getVector(down), State);
+move(Vector, State) ->
+    {struct, JsonData} = State,
+
+    case 
+        proplists:get_value(over, JsonData) or (
+            proplists:get_value(won, JsonData) and (not proplists:get_value(keepPlaying, JsonData))
+        )
+    of
+        true -> State;
+        _Else ->
+            PreparedJsonData = updateBestScore(prepareTiles(JsonData)),
+
+            { TraversalsX, TraversalsY } = buildTraversals(Vector),
+
+            NewJsonData = process_travesals_y(
+                TraversalsY,
+                TraversalsX,
+                Vector,
+                PreparedJsonData
+            ),
+
+            NewGrid = proplists:get_value(grid, NewJsonData),
+            Grid = proplists:get_value(grid, PreparedJsonData),
+
+            if
+                NewGrid =/= Grid -> %If changed - add new tile
+                    
+                    {struct, UserJsonData} = proplists:get_value(user, NewJsonData),
+
+                    NewScore = proplists:get_value(score, NewJsonData),
+                    Score = proplists:get_value(score, PreparedJsonData),
+
+                    case NewScore > Score of true ->
+                        db:insert(
+                            proplists:get_value(score, NewJsonData),
+                            proplists:get_value(id, UserJsonData)
+                        );
+                        _Else -> undefined
+                    end,
+
+                    Over = case movesAvailable(NewGrid) of
+                        true -> false;
+                        fale -> true % Game over!
+                    end,
+                    Removed = my_proplists:delete_several([grid, over], NewJsonData),
+                    {struct,[{ grid, addRandomTile(NewGrid) }, { over, Over } | Removed ]};
+                true -> %return state otherwise
+                    {struct,PreparedJsonData}
+            end
+    end.
 ````
