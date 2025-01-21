@@ -284,3 +284,6 @@ createUser(UserName) ->
 changeName(Id, NewName) ->
     sqlite3:update(db, users, {id, Id}, [{name, NewName}]).
 ````
+
+## Заключение
+В ходе выполнения данной работы, нами были получены навыки создания веб-серверов на языке Erlang и работы с БД на языке Erlang.
